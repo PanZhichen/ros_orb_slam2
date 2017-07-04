@@ -30,3 +30,6 @@
 *.exe
 *.out
 *.app
+
+# curtis editor
+.remote-sync.json
