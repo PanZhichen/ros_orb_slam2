@@ -33,3 +33,5 @@
 
 # curtis editor
 .remote-sync.json
+
+*.kdev4

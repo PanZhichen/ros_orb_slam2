@@ -1,96 +1,87 @@
-#include <iostream>
-#include <algorithm>
-#include <fstream>
-#include <chrono>
+#include<iostream>
+#include<algorithm>
+#include<fstream>
+#include<chrono>
 
-#include <ros/ros.h>
-#include <ros/node_handle.h>
-#include <ros/init.h>
+#include<ros/ros.h>
+#include <nav_msgs/Odometry.h>
 #include <cv_bridge/cv_bridge.h>
 #include <geometry_msgs/Pose.h>
-#include <image_transport/image_transport.h>
 #include <tf/transform_broadcaster.h>
-#include <opencv2/core/core.hpp>
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
+#include<opencv2/core/core.hpp>
 
 #include <System.h>   // from ORB_SLAM2
 #include <Converter.h>
 
-template <typename T>
-T getParam(const ros::NodeHandle& nh, const std::string& param_name, T default_value)
+
+using namespace std;
+ros::Publisher voPubliser;
+//cv::Mat Rwc_Pre = cv::Mat::eye(3,3,CV_32F);
+
+class ImageGrabber
 {
-  T value;
-  if (nh.hasParam(param_name))
-  {
-    nh.getParam(param_name, value);
-  }
-  else
-  {
-    ROS_WARN_STREAM("Parameter '" << param_name << "' not found, defaults to '" << default_value << "'");
-    value = default_value;
-  }
-  return value;
-}
-
-class ORBSLAM2Node {
-private:
-  ORB_SLAM2::System* mpSLAM;
-  std::string worldframe, frame;
-  tf::TransformBroadcaster br;
-
 public:
-  ORBSLAM2Node(ORB_SLAM2::System* pSLAM, std::string worldframe, std::string frame):mpSLAM(pSLAM),worldframe(worldframe),frame(frame) {
+    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM){}
 
-  }
-  void imageCallback(const sensor_msgs::ImageConstPtr& msg);
+    void GrabImage(const sensor_msgs::ImageConstPtr& msgImag,const sensor_msgs::ImageConstPtr& msgDepth);
+
+    ORB_SLAM2::System* mpSLAM;
 };
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "orb_slam2_mono");
-    ros::NodeHandle local_nh("~");
+    ros::init(argc, argv, "lidar_orb_mono");
+    ros::start();
 
-    std::string camera_src = getParam(local_nh, "camera", std::string("/camera/image"));
-    std::string worldframe = getParam(local_nh, "worldframe", std::string("/world"));
-    std::string frame = getParam(local_nh, "frame", std::string("orbframe"));
-    std::string path_vocabulary = getParam(local_nh, "path_vocabulary", std::string(""));
-    std::string path_settings = getParam(local_nh, "path_settings", std::string(""));
-    bool use_viewer = getParam(local_nh, "use_viewer", false);
-
-    if (path_vocabulary.empty()) {
-      ROS_ERROR_STREAM("path_vocabulary is not provided.");
-      return -1;
-    }
-
-    if (path_settings.empty()) {
-      ROS_ERROR_STREAM("path_settings is not provided.");
-      return -1;
-    }
+    if(argc != 3)
+    {
+        cerr << endl << "Usage: rosrun ORB_SLAM2 Mono path_to_vocabulary path_to_settings" << endl;        
+        ros::shutdown();
+        return 1;
+    }    
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ros::NodeHandle nh;
+    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
 
-    ORB_SLAM2::System SLAM(path_vocabulary.c_str(), path_settings.c_str(), ORB_SLAM2::System::MONOCULAR, use_viewer);
-    ORBSLAM2Node orbslam2_node(&SLAM, worldframe, frame);
+    ImageGrabber igb(&SLAM);
 
-    image_transport::ImageTransport img_t(nh);
-    image_transport::Subscriber sub = img_t.subscribe(camera_src, 1, &ORBSLAM2Node::imageCallback, &orbslam2_node);
+    ros::NodeHandle nodeHandler;
+    //0131ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
+    
+    //************************************************************************************************************//
+    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nodeHandler, "/camera/rgb/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nodeHandler, "camera/depth_registered/image_raw", 1);
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
+    message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub,depth_sub);
+    sync.registerCallback(boost::bind(&ImageGrabber::GrabImage,&igb,_1,_2));
+    
+    voPubliser = nodeHandler.advertise<nav_msgs::Odometry> ("/cam_to_odom", 5);
+    //************************************************************************************************************//
 
     ros::spin();
 
     // Stop all threads
     SLAM.Shutdown();
+
+    // Save camera trajectory
+    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+
     ros::shutdown();
 
     return 0;
 }
 
-void ORBSLAM2Node::imageCallback(const sensor_msgs::ImageConstPtr& msg)
-{
+void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag,const sensor_msgs::ImageConstPtr& msgDepth)
+{   
     // Copy the ros image message to cv::Mat.
-    cv_bridge::CvImageConstPtr cv_ptr;
+    cv_bridge::CvImageConstPtr cv_ptrImage;
     try
     {
-        cv_ptr = cv_bridge::toCvShare(msg);
+        cv_ptrImage = cv_bridge::toCvShare(msgImag);
     }
     catch (cv_bridge::Exception& e)
     {
@@ -98,22 +89,39 @@ void ORBSLAM2Node::imageCallback(const sensor_msgs::ImageConstPtr& msg)
         return;
     }
 
-    cv::Mat Tcw = mpSLAM->TrackMonocular(cv_ptr->image, cv_ptr->header.stamp.toSec());
-    if (Tcw.empty()) {
-      return;
+    cv_bridge::CvImageConstPtr cv_ptrDepth;
+    try
+    {
+        cv_ptrDepth = cv_bridge::toCvShare(msgDepth);
+    }
+    catch (cv_bridge::Exception& e)
+    {
+        ROS_ERROR("cv_bridge exception: %s", e.what());
+        return;
     }
 
+    cv::Mat Tcw=mpSLAM->TrackMonocular(cv_ptrImage->image,cv_ptrDepth->image,cv_ptrImage->header.stamp.toSec());
     cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
     cv::Mat twc = -Rwc*Tcw.rowRange(0,3).col(3);
 
     vector<float> q = ORB_SLAM2::Converter::toQuaternion(Rwc);
+    
+    
+    nav_msgs::Odometry voData;
+    voData.header.frame_id = "odom";
+    voData.child_frame_id = "camera";
+    voData.header.stamp = cv_ptrImage->header.stamp;
+    voData.pose.pose.orientation.x = q[0];
+    voData.pose.pose.orientation.y = q[1];
+    voData.pose.pose.orientation.z = q[2];
+    voData.pose.pose.orientation.w = q[3];
+    voData.pose.pose.position.x = twc.at<float>(0, 0);
+    voData.pose.pose.position.y = twc.at<float>(0, 1);
+    voData.pose.pose.position.z = twc.at<float>(0, 2);
+    voData.twist.twist.angular.x = 0.0;
+    voData.twist.twist.angular.y = 0.0;
+    voData.twist.twist.angular.z = 0.0;
+    voPubliser.publish(voData);
 
-    const float MAP_SCALE = 1000.0f;
-
-    tf::Transform transform;
-    transform.setOrigin(tf::Vector3(twc.at<float>(0, 0) * MAP_SCALE, twc.at<float>(0, 1) * MAP_SCALE, twc.at<float>(0, 2) * MAP_SCALE));
-    tf::Quaternion quaternion(q[0], q[1], q[2], q[3]);
-    transform.setRotation(quaternion);
-
-    br.sendTransform(tf::StampedTransform(transform, ros::Time(cv_ptr->header.stamp.toSec()), worldframe, frame));
 }
+

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(orb_slam2)
+project(ros_orb_slam2)
 
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
@@ -12,6 +12,7 @@ add_definitions(-std=c++11)
 add_definitions(-DCOMPILEDWITHC11)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 -march=native ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3 -march=native")
+LIST(APPEND CMAKE_MODULE_PATH /home/nrsl/orb_ws/src/Lidar_in_Orb/cmake_modules)
 
 find_package(OpenCV 3.0 QUIET)
 if(NOT OpenCV_FOUND)
@@ -28,14 +29,13 @@ find_package(Pangolin REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
-
   tf
   cv_bridge
-
   std_msgs
   sensor_msgs
   geometry_msgs
   image_transport
+  pcl_ros
 )
 
 catkin_package(
@@ -45,9 +45,10 @@ catkin_package(
     geometry_msgs
     image_transport
     tf
+    pcl_ros
 )
 
-set(ORBSLAM2_DIR "$ENV{ORBSLAM2_HOME}")
+set(ORBSLAM2_DIR "/home/nrsl/orb_ws/src/Lidar_in_Orb")
 if(ORBSLAM2_DIR)
     message(STATUS "ORBSLAM2_HOME at ${OPENPOSE_DIR}")
 else()
@@ -79,3 +80,17 @@ target_link_libraries(${PROJECT_NAME}_mono
   ${EIGEN3_LIBS}
   ${Pangolin_LIBRARIES}
 )
+
+add_executable(doPointCloud_node src/processDepthmap.cpp)
+target_link_libraries(doPointCloud_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES})
+
+
+add_executable(transPointCloud_node src/trans_vlp.cpp)
+target_link_libraries(transPointCloud_node
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+ )
+
+
+
+
