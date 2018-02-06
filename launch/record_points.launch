@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <launch>
 
-  <node pkg="trans_vlp" type="trans_vlp_node" name="trans_vlp_node" />
+  <node pkg="ros_orb_slam2" type="transPointCloud_node" name="transPointCloud_node" />
 
-  <node pkg="rosbag" type="record" name="record" args="-o /home/nrsl/velodyne_ws/bagfiles /camera/image_raw /sync_scan_cloud_filtered" output="screen" >
+  <node pkg="rosbag" type="record" name="record" args="-o /home/nrsl/orb_ws/bagfiles/ /camera/image_raw /sync_scan_cloud_filtered" output="screen" >
   </node>
 
 </launch>

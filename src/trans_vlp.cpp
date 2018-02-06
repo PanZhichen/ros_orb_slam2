@@ -55,7 +55,7 @@ void PointCloudHandler(const sensor_msgs::PointCloud2ConstPtr& msg_pc)
   sensor_msgs::PointCloud2 trans_pc;
   pcl::toROSMsg(*vlp_PC,trans_pc);
   //trans_pc.header.frame_id="/velodyne";
-  trans_pc.header.frame_id="/camera_init";
+  trans_pc.header.frame_id="camera";
   trans_pc.header.stamp=msg_pc->header.stamp;
   TransPointPub.publish(trans_pc);
 }

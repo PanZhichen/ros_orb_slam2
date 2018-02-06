@@ -20,6 +20,7 @@
 
 using namespace std;
 ros::Publisher voPubliser;
+tf::TransformBroadcaster *tfBroadcasterPointer = NULL;
 //cv::Mat Rwc_Pre = cv::Mat::eye(3,3,CV_32F);
 
 class ImageGrabber
@@ -60,6 +61,9 @@ int main(int argc, char **argv)
     sync.registerCallback(boost::bind(&ImageGrabber::GrabImage,&igb,_1,_2));
     
     voPubliser = nodeHandler.advertise<nav_msgs::Odometry> ("/cam_to_odom", 5);
+    
+    tf::TransformBroadcaster tfBroadcaster;
+    tfBroadcasterPointer = &tfBroadcaster;
     //************************************************************************************************************//
 
     ros::spin();
@@ -122,6 +126,14 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag,const sen
     voData.twist.twist.angular.y = 0.0;
     voData.twist.twist.angular.z = 0.0;
     voPubliser.publish(voData);
+    
+    tf::StampedTransform voTrans;
+    voTrans.frame_id_ = "odom";
+    voTrans.child_frame_id_ = "camera";
+    voTrans.stamp_ = cv_ptrImage->header.stamp;
+    voTrans.setRotation(tf::Quaternion(q[0], q[1], q[2], q[3]));
+    voTrans.setOrigin(tf::Vector3(twc.at<float>(0, 0), twc.at<float>(0, 1), twc.at<float>(0, 2)));
+    tfBroadcasterPointer->sendTransform(voTrans);
 
 }
 

@@ -38,6 +38,9 @@ pcl::PointCloud<pcl::PointXYZI>::Ptr tempCloud2(new pcl::PointCloud<pcl::PointXY
 double timeRec = 0;
 double rxRec = 0, ryRec = 0, rzRec = 0;
 double txRec = 0, tyRec = 0, tzRec = 0;
+tf::Matrix3x3 R_wl(1.0,0.0,0.0,
+                   0.0,1.0,0.0,
+		   0.0,0.0,1.0);
 
 bool systemInited = false;
 double initTime;
@@ -51,15 +54,19 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
 {
   double time = voData->header.stamp.toSec();
 
-  double roll, pitch, yaw;
+   double roll, pitch, yaw;
+   double rx , ry ,rz;
   geometry_msgs::Quaternion geoQuat = voData->pose.pose.orientation;
   //roll,pitch,yaw是根据默认的x,y,z轴来的，所以当我们的坐标系和默认坐标系不同时，就需要指定各个轴的对应关系。比如这里我们就将默认
   //坐标系的x,y,z分别对应成我们的z,x,y轴，这样计算出来的roll就是绕z轴的旋转，而不是默认的绕x轴的旋转。
-  tf::Matrix3x3(tf::Quaternion(geoQuat.z, -geoQuat.x, -geoQuat.y, geoQuat.w)).getRPY(roll, pitch, yaw);
-
-  double rx = voData->twist.twist.angular.x - rxRec;
-  double ry = voData->twist.twist.angular.y - ryRec;
-  double rz = voData->twist.twist.angular.z - rzRec;
+  //tf::Matrix3x3(tf::Quaternion(geoQuat.z, -geoQuat.x, -geoQuat.y, geoQuat.w)).getRPY(roll, pitch, yaw);
+  tf::Matrix3x3 R_wc = tf::Matrix3x3(tf::Quaternion(geoQuat.z, geoQuat.x, geoQuat.y, geoQuat.w));
+  R_wc.getRPY(roll,pitch,yaw);
+  pitch*=(-1.0);
+  yaw*=(-1.0);
+  tf::Matrix3x3 R_lc = R_wl.transpose()*R_wc;
+  R_lc.getRPY(rz,rx,ry);
+  R_wl = R_wc;
 
   if (ry < -PI) {
     ry += 2 * PI;
@@ -70,10 +77,6 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
   double tx = voData->pose.pose.position.x - txRec;
   double ty = voData->pose.pose.position.y - tyRec;
   double tz = voData->pose.pose.position.z - tzRec;
-
-  rxRec = voData->twist.twist.angular.x;
-  ryRec = voData->twist.twist.angular.y;
-  rzRec = voData->twist.twist.angular.z;
 
   txRec = voData->pose.pose.position.x;
   tyRec = voData->pose.pose.position.y;
@@ -319,15 +322,16 @@ void syncCloudHandler(const sensor_msgs::PointCloud2ConstPtr& syncCloud2)
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "processDepthmap");
+  ros::init(argc, argv, "doPointCloud");
   ros::NodeHandle nh;
 
-  ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_odom", 5, voDataHandler);
+  //ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_odom", 5, voDataHandler);
+  ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_init", 5, voDataHandler);
 
   ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::PointCloud2>
                                  ("/sync_scan_cloud_filtered", 5, syncCloudHandler);
 
-  ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/depth_cloud", 5);
+  ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/find_depth", 5);
   depthCloudPubPointer = &depthCloudPub;
 
   ros::spin();
