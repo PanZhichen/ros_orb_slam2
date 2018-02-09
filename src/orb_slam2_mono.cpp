@@ -16,22 +16,31 @@
 
 #include <System.h>   // from ORB_SLAM2
 #include <Converter.h>
+#include <doPointCloud/pointDefinition.h>
 
 
 using namespace std;
 ros::Publisher voPubliser;
 tf::TransformBroadcaster *tfBroadcasterPointer = NULL;
-//cv::Mat Rwc_Pre = cv::Mat::eye(3,3,CV_32F);
+pcl::PointCloud<pcl::PointXYZI>::Ptr depthCloud(new pcl::PointCloud<pcl::PointXYZI>());
 
 class ImageGrabber
 {
 public:
     ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM){}
 
-    void GrabImage(const sensor_msgs::ImageConstPtr& msgImag,const sensor_msgs::ImageConstPtr& msgDepth);
+    //void GrabImage(const sensor_msgs::ImageConstPtr& msgImag,const sensor_msgs::ImageConstPtr& msgDepth);
+    void GrabImage(const sensor_msgs::ImageConstPtr& msgImag);
 
     ORB_SLAM2::System* mpSLAM;
 };
+
+void DepthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& Cloud)
+{
+  depthCloud->clear();
+  pcl::fromROSMsg(*Cloud, *depthCloud);
+}
+
 
 int main(int argc, char **argv)
 {
@@ -54,11 +63,14 @@ int main(int argc, char **argv)
     //0131ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
     
     //************************************************************************************************************//
-    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nodeHandler, "/camera/rgb/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nodeHandler, "camera/depth_registered/image_raw", 1);
-    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
-    message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub,depth_sub);
-    sync.registerCallback(boost::bind(&ImageGrabber::GrabImage,&igb,_1,_2));
+    //message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nodeHandler, "/camera/rgb/image_raw", 1);
+    //message_filters::Subscriber<sensor_msgs::Image> depth_sub(nodeHandler, "camera/depth_registered/image_raw", 1);
+    //typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
+    //message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub,depth_sub);
+    //sync.registerCallback(boost::bind(&ImageGrabber::GrabImage,&igb,_1,_2));
+    
+    ros::Subscriber CloudSub = nodeHandler.subscribe<sensor_msgs::PointCloud2>("/find_depth", 2, DepthCloudHandler);
+    ros::Subscriber imageSub = nodeHandler.subscribe<sensor_msgs::Image>("/camera/image_raw", 2, &ImageGrabber::GrabImage,&igb);
     
     voPubliser = nodeHandler.advertise<nav_msgs::Odometry> ("/cam_to_odom", 5);
     
@@ -67,7 +79,7 @@ int main(int argc, char **argv)
     //************************************************************************************************************//
 
     ros::spin();
-
+    
     // Stop all threads
     SLAM.Shutdown();
 
@@ -79,7 +91,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag,const sensor_msgs::ImageConstPtr& msgDepth)
+void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
 {   
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptrImage;
@@ -93,23 +105,24 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag,const sen
         return;
     }
 
-    cv_bridge::CvImageConstPtr cv_ptrDepth;
-    try
-    {
-        cv_ptrDepth = cv_bridge::toCvShare(msgDepth);
+    cv::Mat Tcw=mpSLAM->TrackMonocular(cv_ptrImage->image,depthCloud,cv_ptrImage->header.stamp.toSec());
+    
+    if (Tcw.empty()) {
+      return;
     }
-    catch (cv_bridge::Exception& e)
-    {
-        ROS_ERROR("cv_bridge exception: %s", e.what());
-        return;
+    else{
+      //如果在Tracking中失败，要把Tcw的（0,0）和（0,1）处的值置为99.99；
+      if((Tcw.at<int>(0,0)==99)&&(Tcw.at<int>(0,1)==99))
+      {
+	std::cout<<"\033[31m Wrong Estimation!!"<<"\033[0m"<<std::endl;
+        Tcw = cv::Mat::eye(4,4,CV_32F);
+      }
     }
-
-    cv::Mat Tcw=mpSLAM->TrackMonocular(cv_ptrImage->image,cv_ptrDepth->image,cv_ptrImage->header.stamp.toSec());
+    
     cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
     cv::Mat twc = -Rwc*Tcw.rowRange(0,3).col(3);
 
     vector<float> q = ORB_SLAM2::Converter::toQuaternion(Rwc);
-    
     
     nav_msgs::Odometry voData;
     voData.header.frame_id = "odom";
