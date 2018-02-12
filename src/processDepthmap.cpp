@@ -192,7 +192,7 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
 
     sensor_msgs::PointCloud2 depthCloud2;
     pcl::toROSMsg(*tempCloud2, depthCloud2);
-    depthCloud2.header.frame_id = "camera2";
+    depthCloud2.header.frame_id = "camera";
     depthCloud2.header.stamp = voData->header.stamp;
     depthCloudPubPointer->publish(depthCloud2);
   }
@@ -213,7 +213,7 @@ void syncCloudHandler(const sensor_msgs::PointCloud2ConstPtr& syncCloud2)
   }
   double time = syncCloud2->header.stamp.toSec();
   double timeLasted = time - initTime;
-
+  
   syncCloud->clear();
   pcl::fromROSMsg(*syncCloud2, *syncCloud);
 
@@ -260,8 +260,8 @@ void syncCloudHandler(const sensor_msgs::PointCloud2ConstPtr& syncCloud2)
   double x1, y1, z1, x2, y2, z2;
   int syncCloudNum = syncCloud->points.size();
   for (int i = 0; i < syncCloudNum; i++) {
-    point.x = syncCloud->points[i].x;
-    point.y = syncCloud->points[i].y;
+    point.x = -(syncCloud->points[i].x);//////////add an inverse symbol
+    point.y = -(syncCloud->points[i].y);//////////add an inverse symbol
     point.z = syncCloud->points[i].z;
     point.intensity = timeLasted;
 
@@ -325,8 +325,7 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "doPointCloud");
   ros::NodeHandle nh;
 
-  //ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_odom", 5, voDataHandler);
-  ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_init", 5, voDataHandler);
+  ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_odom", 5, voDataHandler);
 
   ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::PointCloud2>
                                  ("/sync_scan_cloud_filtered", 5, syncCloudHandler);

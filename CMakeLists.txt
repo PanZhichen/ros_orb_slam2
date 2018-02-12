@@ -91,6 +91,7 @@ target_link_libraries(transPointCloud_node
    ${PCL_LIBRARIES}
  )
 
-
+add_executable(test_node src/test.cpp)
+target_link_libraries(test_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES})
 
 
