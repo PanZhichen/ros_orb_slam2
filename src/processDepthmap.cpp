@@ -150,7 +150,7 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
 
       double pointDis = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
       double timeDis = time - initTime - point.intensity;
-      if (fabs(point.x / point.z) < 3 && fabs(point.y / point.z) < 3 && point.z > 0.5 && pointDis < 15 &&
+      if (fabs(point.x / point.z) < 3 && fabs(point.y / point.z) < 3 && point.z > 0.5 && pointDis < 25 &&
           timeDis < 5.0) {
         tempCloud->push_back(point);
       }
@@ -314,7 +314,7 @@ void syncCloudHandler(const sensor_msgs::PointCloud2ConstPtr& syncCloud2)
     }
 
     double pointDis = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
-    if (fabs(point.x / point.z) < 2 && fabs(point.y / point.z) < 1.5 && point.z > 0.5 && pointDis < 15) {
+    if (fabs(point.x / point.z) < 2 && fabs(point.y / point.z) < 1.5 && point.z > 0.5 && pointDis < 25) {
       depthCloud->push_back(point);
     }
   }

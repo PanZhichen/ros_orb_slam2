@@ -18,11 +18,17 @@
 #include <Converter.h>
 #include <doPointCloud/pointDefinition.h>
 
+const double PI = 3.1415926;
+const uint8_t IMAGE_SKIP = 3;
 
 using namespace std;
 ros::Publisher voPubliser;
 tf::TransformBroadcaster *tfBroadcasterPointer = NULL;
 pcl::PointCloud<pcl::PointXYZI>::Ptr depthCloud(new pcl::PointCloud<pcl::PointXYZI>());
+nav_msgs::Odometry fresh_odom, curr_odom, last_odom;
+bool INITIALIZED=false;
+bool Refresh_DepthCloud = false;
+cv::Mat Twl = cv::Mat::eye(4,4,CV_32F);
 
 class ImageGrabber
 {
@@ -39,6 +45,7 @@ void DepthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& Cloud)
 {
   depthCloud->clear();
   pcl::fromROSMsg(*Cloud, *depthCloud);
+  Refresh_DepthCloud = true;
 }
 
 
@@ -93,6 +100,12 @@ int main(int argc, char **argv)
 
 void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
 {   
+    static uint8_t ImageCount = 0;
+    ImageCount = (ImageCount + 1) % IMAGE_SKIP;
+    if(ImageCount != 0){
+      return;
+    } 
+  
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptrImage;
     try
@@ -105,7 +118,8 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
         return;
     }
 
-    cv::Mat Tcw=mpSLAM->TrackMonocular(cv_ptrImage->image,depthCloud,cv_ptrImage->header.stamp.toSec());
+    cv::Mat Tcw=mpSLAM->TrackMonocular(cv_ptrImage->image,depthCloud,cv_ptrImage->header.stamp.toSec(),Refresh_DepthCloud);
+    Refresh_DepthCloud = false;
     
     if (Tcw.empty()) {
       return;
