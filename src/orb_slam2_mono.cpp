@@ -100,11 +100,11 @@ int main(int argc, char **argv)
 
 void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
 {   
-    static uint8_t ImageCount = 0;
-    ImageCount = (ImageCount + 1) % IMAGE_SKIP;
-    if(ImageCount != 0){
-      return;
-    } 
+//     static uint8_t ImageCount = 0;
+//     ImageCount = (ImageCount + 1) % IMAGE_SKIP;
+//     if(ImageCount != 0){
+//       return;
+//     } 
   
     // Copy the ros image message to cv::Mat.
     cv_bridge::CvImageConstPtr cv_ptrImage;
@@ -126,7 +126,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
     }
     else{
       //如果在Tracking中失败，要把Tcw的（0,0）和（0,1）处的值置为99.99；
-      if((Tcw.at<int>(0,0)==99)&&(Tcw.at<int>(0,1)==99))
+      if((Tcw.at<float>(0,0)==99)&&(Tcw.at<float>(0,1)==99))
       {
 	std::cout<<"\033[31m Wrong Estimation!!"<<"\033[0m"<<std::endl;
         Tcw = cv::Mat::eye(4,4,CV_32F);
