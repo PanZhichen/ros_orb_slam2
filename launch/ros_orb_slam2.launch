@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- include file="$(find velodyne_pointcloud)/launch/VLP16_points.launch" />
+  
+  <include file="$(find pointgrey_camera_driver)/launch/camera.launch" / -->
+  
+  <!-- node pkg="trans_vlp" type="trans_vlp_node" name="trans_vlp_node" / -->
+
+  <!--<node pkg="rosbag" type="record" name="record" args="-o /home/nrsl/velodyne_ws/bagfiles /camera/image_raw /sync_scan_cloud_filtered" output="screen" >
+  </node> -->
+
+  <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find ros_orb_slam2)/conf/ros_orb_slam2.rviz"/>
+
+  <!-- node pkg="rviz" type="rviz" name="rviz" args="-d $(find ros_orb_slam2)/conf/ros_orb_slam2.rviz"/ -->
+  
+  <node pkg="ros_orb_slam2" type="ros_orb_slam2_mono" name="ros_orb_slam2_mono" args="/home/nrsl/orb_ws/src/Lidar_in_Orb/Vocabulary/ORBvoc.bin /home/nrsl/orb_ws/src/Lidar_in_Orb/Examples/Monocular/para_mono.yaml" output="screen" />
+
+  <node pkg="ros_orb_slam2" type="doPointCloud_node" name="doPointCloud_node" />
+
+</launch>

@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+  <include file="/home/nrsl/velodyne_ws/src/pointgrey_camera_driver/pointgrey_camera_driver/launch/camera.launch" />
+  
+  <include file="/home/nrsl/velodyne_ws/src/velodyne/velodyne_pointcloud/launch/VLP16_points.launch" />
+
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find ros_orb_slam2)/conf/ros_orb_slam2.rviz"/>
+
+</launch>
+
+

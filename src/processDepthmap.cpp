@@ -8,16 +8,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ros/ros.h>
-
+#include<ros/package.h>
 #include <nav_msgs/Odometry.h>
 
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
+#include<pcl/common/transforms.h>
+#include<pcl/common/eigen.h>
 
 #include "doPointCloud/pointDefinition.h"
 
 const double PI = 3.1415926;
+const float FILTER_Horiz = 1.5, FILTER_Vert = 1.0;
 
 const int keepVoDataNum = 30;
 double voDataTime[keepVoDataNum] = {0};
@@ -32,6 +35,7 @@ int voRegInd = 0;
 
 pcl::PointCloud<pcl::PointXYZI>::Ptr depthCloud(new pcl::PointCloud<pcl::PointXYZI>());
 pcl::PointCloud<pcl::PointXYZ>::Ptr syncCloud(new pcl::PointCloud<pcl::PointXYZ>());
+pcl::PointCloud<pcl::PointXYZ>::Ptr temp_syncCloud(new pcl::PointCloud<pcl::PointXYZ>());
 pcl::PointCloud<pcl::PointXYZI>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZI>());
 pcl::PointCloud<pcl::PointXYZI>::Ptr tempCloud2(new pcl::PointCloud<pcl::PointXYZI>());
 
@@ -49,6 +53,22 @@ int startCount = -1;
 const int startSkipNum = 5;
 
 ros::Publisher *depthCloudPubPointer = NULL;
+
+struct vlpTocamera
+{
+  float x,y,z,roll,pitch,yaw;
+}vlptocamera;
+
+void readConfig()
+{
+	std::string pkg_loc = ros::package::getPath("ros_orb_slam2");
+	std::ifstream infile(pkg_loc + "/conf/config_file.txt");
+
+	infile >> vlptocamera.x >> vlptocamera.y >> vlptocamera.z >> vlptocamera.roll
+	       >> vlptocamera.pitch >> vlptocamera.yaw ;
+
+	infile.close();
+}
 
 void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
 {
@@ -150,7 +170,7 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
 
       double pointDis = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
       double timeDis = time - initTime - point.intensity;
-      if (fabs(point.x / point.z) < 3 && fabs(point.y / point.z) < 3 && point.z > 0.5 && pointDis < 25 &&
+      if (fabs(point.x / point.z) < FILTER_Horiz && fabs(point.y / point.z) < FILTER_Vert && point.z > 0.5 && pointDis < 50 &&
           timeDis < 5.0) {
         tempCloud->push_back(point);
       }
@@ -167,7 +187,7 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
     for (int i = 0; i < depthCloudNum; i++) {
       point = depthCloud->points[i];
 
-      if (fabs(point.x / point.z) < 1 && fabs(point.y / point.z) < 0.6) {
+      if (fabs(point.x / point.z) < FILTER_Horiz && fabs(point.y / point.z) < FILTER_Vert) {
         point.intensity = depthCloud->points[i].z;
         point.x *= 10 / depthCloud->points[i].z;
         point.y *= 10 / depthCloud->points[i].z;
@@ -215,7 +235,27 @@ void syncCloudHandler(const sensor_msgs::PointCloud2ConstPtr& syncCloud2)
   double timeLasted = time - initTime;
   
   syncCloud->clear();
+  temp_syncCloud->clear();
   pcl::fromROSMsg(*syncCloud2, *syncCloud);
+  //**************************************************//
+  pcl::PointXYZ temp;
+  for(u_int i=0; i<syncCloud->points.size(); i++)
+  {
+    if(fabs(syncCloud->points[i].y / syncCloud->points[i].x) < FILTER_Horiz && fabs(syncCloud->points[i].z / syncCloud->points[i].x) < FILTER_Vert && syncCloud->points[i].x > 0.5 )
+    {
+      temp.x=syncCloud->points[i].x;
+      temp.y=syncCloud->points[i].y;
+      temp.z=syncCloud->points[i].z;
+      temp_syncCloud->points.push_back(temp);
+    }
+  }
+  
+  syncCloud->clear();
+  
+  Eigen::Affine3f transf = pcl::getTransformation(vlptocamera.x,vlptocamera.y,vlptocamera.z,
+						  vlptocamera.roll,vlptocamera.pitch,vlptocamera.yaw);
+  pcl::transformPointCloud(*temp_syncCloud, *syncCloud, transf);
+  //**********************************************************//
 
   double scale = 0;
   int voPreInd = keepVoDataNum - 1;
@@ -260,8 +300,8 @@ void syncCloudHandler(const sensor_msgs::PointCloud2ConstPtr& syncCloud2)
   double x1, y1, z1, x2, y2, z2;
   int syncCloudNum = syncCloud->points.size();
   for (int i = 0; i < syncCloudNum; i++) {
-    point.x = -(syncCloud->points[i].x);//////////add an inverse symbol
-    point.y = -(syncCloud->points[i].y);//////////add an inverse symbol
+    point.x = syncCloud->points[i].x;///////////////
+    point.y = syncCloud->points[i].y;//////////////
     point.z = syncCloud->points[i].z;
     point.intensity = timeLasted;
 
@@ -314,7 +354,7 @@ void syncCloudHandler(const sensor_msgs::PointCloud2ConstPtr& syncCloud2)
     }
 
     double pointDis = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
-    if (fabs(point.x / point.z) < 2 && fabs(point.y / point.z) < 1.5 && point.z > 0.5 && pointDis < 25) {
+    if (fabs(point.x / point.z) < FILTER_Horiz && fabs(point.y / point.z) < FILTER_Vert && point.z > 0.5 && pointDis < 50) {
       depthCloud->push_back(point);
     }
   }
@@ -324,11 +364,16 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "doPointCloud");
   ros::NodeHandle nh;
+  
+  readConfig();
 
   ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_odom", 5, voDataHandler);
 
+//   ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::PointCloud2>
+//                                  ("/sync_scan_cloud_filtered", 5, syncCloudHandler);
+  
   ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::PointCloud2>
-                                 ("/sync_scan_cloud_filtered", 5, syncCloudHandler);
+                                  ("/velodyne_points", 5, syncCloudHandler);
 
   ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/find_depth", 5);
   depthCloudPubPointer = &depthCloudPub;
