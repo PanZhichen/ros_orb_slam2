@@ -6,7 +6,7 @@
 #include<ros/ros.h>
 #include <nav_msgs/Odometry.h>
 #include <cv_bridge/cv_bridge.h>
-#include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PoseArray.h>
 #include <tf/transform_broadcaster.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
@@ -15,6 +15,7 @@
 #include<opencv2/core/core.hpp>
 
 #include <System.h>   // from ORB_SLAM2
+#include <KeyFrame.h>
 #include <Converter.h>
 #include <doPointCloud/pointDefinition.h>
 
@@ -23,8 +24,10 @@ const uint8_t IMAGE_SKIP = 3;
 
 using namespace std;
 ros::Publisher voPubliser;
+ros::Publisher KFPubliser;
 tf::TransformBroadcaster *tfBroadcasterPointer = NULL;
 pcl::PointCloud<pcl::PointXYZI>::Ptr depthCloud(new pcl::PointCloud<pcl::PointXYZI>());
+sensor_msgs::PointCloud2ConstPtr CloudWithKF;
 nav_msgs::Odometry fresh_odom, curr_odom, last_odom;
 bool INITIALIZED=false;
 bool Refresh_DepthCloud = false;
@@ -46,6 +49,7 @@ void DepthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& Cloud)
   depthCloud->clear();
   pcl::fromROSMsg(*Cloud, *depthCloud);
   Refresh_DepthCloud = true;
+  CloudWithKF = Cloud;
 }
 
 
@@ -80,6 +84,7 @@ int main(int argc, char **argv)
     ros::Subscriber imageSub = nodeHandler.subscribe<sensor_msgs::Image>("/camera/image_raw", 2, &ImageGrabber::GrabImage,&igb);
     
     voPubliser = nodeHandler.advertise<nav_msgs::Odometry> ("/cam_to_odom", 5);
+    KFPubliser = nodeHandler.advertise<sensor_msgs::PointCloud2>("/KeyFramePose",1);
     
     tf::TransformBroadcaster tfBroadcaster;
     tfBroadcasterPointer = &tfBroadcaster;
@@ -119,7 +124,6 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
     }
 
     cv::Mat Tcw=mpSLAM->TrackMonocular(cv_ptrImage->image,depthCloud,cv_ptrImage->header.stamp.toSec(),Refresh_DepthCloud);
-    Refresh_DepthCloud = false;
     
     if (Tcw.empty()) {
       return;
@@ -161,6 +165,33 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
     voTrans.setRotation(tf::Quaternion(q[0], q[1], q[2], q[3]));
     voTrans.setOrigin(tf::Vector3(twc.at<float>(0, 0), twc.at<float>(0, 1), twc.at<float>(0, 2)));
     tfBroadcasterPointer->sendTransform(voTrans);
-
+    
+    //-----------------------------Publish Current KeyFrame Pose-----------------------------------
+    static long unsigned int KeyFramesIdLast=0;
+    ORB_SLAM2::KeyFrame* k = mpSLAM->getNewestKeyFrame();
+    long unsigned int KeyFramesId = k->mnId;
+    if(mpSLAM->getNumKeyFrames()>0 && KeyFramesId!=KeyFramesIdLast && Refresh_DepthCloud){
+      KeyFramesIdLast=KeyFramesId;
+      //std::cout<<"\033[33m KeyFramesID="<<k->mnId<<"  KeyFramesNum"<<KeyFramesNum<<"\033[0m"<<std::endl;
+      std::cout<<"\033[33m KeyFramesId="<<KeyFramesId<<"\033[0m"<<std::endl;
+      cv::Mat KF_Twc = k->getTwc();
+      vector<float> KF_q = ORB_SLAM2::Converter::toQuaternion(KF_Twc.rowRange(0,3).colRange(0,3));
+      geometry_msgs::Pose pose_t;
+      geometry_msgs::PoseArray pose_a;
+      pose_t.position.x = KF_Twc.at<float>(0,3);
+      pose_t.position.y = KF_Twc.at<float>(1,3);
+      pose_t.position.z = KF_Twc.at<float>(2,3);
+      pose_t.orientation.x = KF_q[0];
+      pose_t.orientation.y = KF_q[1];
+      pose_t.orientation.z = KF_q[2];
+      pose_t.orientation.w = KF_q[3];
+      
+      pose_a.header.stamp = cv_ptrImage->header.stamp;
+      pose_a.header.frame_id = "currKF";
+      pose_a.poses.push_back(pose_t);
+      KFPubliser.publish(*CloudWithKF);
+    }
+    
+    Refresh_DepthCloud = false;
 }
 

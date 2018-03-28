@@ -84,6 +84,9 @@ target_link_libraries(${PROJECT_NAME}_mono
 add_executable(doPointCloud_node src/processDepthmap.cpp)
 target_link_libraries(doPointCloud_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES})
 
+#add_executable(pointcloudRegister_node src/pointcloudRegister.cpp)
+#target_link_libraries(pointcloudRegister_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES})
+
 
 add_executable(transPointCloud_node src/trans_vlp.cpp)
 target_link_libraries(transPointCloud_node
