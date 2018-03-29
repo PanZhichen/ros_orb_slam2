@@ -20,7 +20,7 @@
 #include "doPointCloud/pointDefinition.h"
 
 const double PI = 3.1415926;
-const float FILTER_Horiz = 1.5, FILTER_Vert = 1.0;
+const float FILTER_Horiz = 1.0, FILTER_Vert = 1.0;
 
 const int keepVoDataNum = 30;
 double voDataTime[keepVoDataNum] = {0};
@@ -367,7 +367,7 @@ int main(int argc, char** argv)
   
   readConfig();
 
-  ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_odom", 5, voDataHandler);
+  ros::Subscriber voDataSub = nh.subscribe<nav_msgs::Odometry> ("/cam_to_odom", 3, voDataHandler);
 
 //   ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::PointCloud2>
 //                                  ("/sync_scan_cloud_filtered", 5, syncCloudHandler);
@@ -375,7 +375,7 @@ int main(int argc, char** argv)
   ros::Subscriber syncCloudSub = nh.subscribe<sensor_msgs::PointCloud2>
                                   ("/velodyne_points", 5, syncCloudHandler);
 
-  ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/find_depth", 5);
+  ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/find_depth", 3);
   depthCloudPubPointer = &depthCloudPub;
 
   ros::spin();

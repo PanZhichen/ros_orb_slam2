@@ -36,6 +36,19 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   image_transport
   pcl_ros
+  message_generation
+)
+
+add_message_files(
+  FILES
+  PointCloudWithKF.msg
+)
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  sensor_msgs
+  geometry_msgs
 )
 
 catkin_package(
@@ -46,6 +59,7 @@ catkin_package(
     image_transport
     tf
     pcl_ros
+    message_runtime
 )
 
 set(ORBSLAM2_DIR "/home/nrsl/orb_ws/src/Lidar_in_Orb")
@@ -84,8 +98,8 @@ target_link_libraries(${PROJECT_NAME}_mono
 add_executable(doPointCloud_node src/processDepthmap.cpp)
 target_link_libraries(doPointCloud_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES})
 
-#add_executable(pointcloudRegister_node src/pointcloudRegister.cpp)
-#target_link_libraries(pointcloudRegister_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES})
+add_executable(pointcloudRegister_node src/pointcloudRegister.cpp)
+target_link_libraries(pointcloudRegister_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES})
 
 
 add_executable(transPointCloud_node src/trans_vlp.cpp)

@@ -17,4 +17,6 @@
 
   <node pkg="ros_orb_slam2" type="doPointCloud_node" name="doPointCloud_node" />
 
+  <node pkg="ros_orb_slam2" type="pointcloudRegister_node" name="pointcloudRegister_node" />
+
 </launch>

@@ -18,6 +18,7 @@
 #include <KeyFrame.h>
 #include <Converter.h>
 #include <doPointCloud/pointDefinition.h>
+#include <ros_orb_slam2/PointCloudWithKF.h>
 
 const double PI = 3.1415926;
 const uint8_t IMAGE_SKIP = 3;
@@ -84,7 +85,7 @@ int main(int argc, char **argv)
     ros::Subscriber imageSub = nodeHandler.subscribe<sensor_msgs::Image>("/camera/image_raw", 2, &ImageGrabber::GrabImage,&igb);
     
     voPubliser = nodeHandler.advertise<nav_msgs::Odometry> ("/cam_to_odom", 5);
-    KFPubliser = nodeHandler.advertise<sensor_msgs::PointCloud2>("/KeyFramePose",1);
+    KFPubliser = nodeHandler.advertise<ros_orb_slam2::PointCloudWithKF>("/PointCloud_with_KF",1);
     
     tf::TransformBroadcaster tfBroadcaster;
     tfBroadcasterPointer = &tfBroadcaster;
@@ -170,28 +171,45 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
     static long unsigned int KeyFramesIdLast=0;
     ORB_SLAM2::KeyFrame* k = mpSLAM->getNewestKeyFrame();
     long unsigned int KeyFramesId = k->mnId;
-    if(mpSLAM->getNumKeyFrames()>0 && KeyFramesId!=KeyFramesIdLast && Refresh_DepthCloud){
-      KeyFramesIdLast=KeyFramesId;
-      //std::cout<<"\033[33m KeyFramesID="<<k->mnId<<"  KeyFramesNum"<<KeyFramesNum<<"\033[0m"<<std::endl;
-      std::cout<<"\033[33m KeyFramesId="<<KeyFramesId<<"\033[0m"<<std::endl;
-      cv::Mat KF_Twc = k->getTwc();
-      vector<float> KF_q = ORB_SLAM2::Converter::toQuaternion(KF_Twc.rowRange(0,3).colRange(0,3));
-      geometry_msgs::Pose pose_t;
-      geometry_msgs::PoseArray pose_a;
-      pose_t.position.x = KF_Twc.at<float>(0,3);
-      pose_t.position.y = KF_Twc.at<float>(1,3);
-      pose_t.position.z = KF_Twc.at<float>(2,3);
-      pose_t.orientation.x = KF_q[0];
-      pose_t.orientation.y = KF_q[1];
-      pose_t.orientation.z = KF_q[2];
-      pose_t.orientation.w = KF_q[3];
-      
-      pose_a.header.stamp = cv_ptrImage->header.stamp;
-      pose_a.header.frame_id = "currKF";
-      pose_a.poses.push_back(pose_t);
-      KFPubliser.publish(*CloudWithKF);
-    }
+    static bool SKIP_ONCE = false;
+    static bool NEED_NEXT_PC = false;
     
+    if(mpSLAM->getNumKeyFrames()>0 && (KeyFramesId!=KeyFramesIdLast || NEED_NEXT_PC)){ 
+        if(KeyFramesId!=KeyFramesIdLast){
+	  SKIP_ONCE = false;
+	}
+        NEED_NEXT_PC = true;
+	KeyFramesIdLast=KeyFramesId;
+	
+	if(!SKIP_ONCE){
+	  SKIP_ONCE = true;
+	}
+	else{
+	  if(Refresh_DepthCloud && SKIP_ONCE){
+	    //std::cout<<"\033[33m KeyFramesId="<<KeyFramesId<<"\033[0m"<<std::endl;
+            cv::Mat KF_Twc = k->getTwc();
+            vector<float> KF_q = ORB_SLAM2::Converter::toQuaternion(KF_Twc.rowRange(0,3).colRange(0,3));
+	    ros_orb_slam2::PointCloudWithKF PC_KF;
+	    geometry_msgs::Pose pose_t;
+	    pose_t.position.x = KF_Twc.at<float>(0, 3);
+	    pose_t.position.y = KF_Twc.at<float>(1, 3);
+	    pose_t.position.z = KF_Twc.at<float>(2, 3);
+	    pose_t.orientation.x = KF_q[0];
+	    pose_t.orientation.y = KF_q[1];
+	    pose_t.orientation.z = KF_q[2];
+	    pose_t.orientation.w = KF_q[3];
+	    
+	    PC_KF.KF_Pose.header.stamp = cv_ptrImage->header.stamp;
+	    PC_KF.KF_Pose.header.frame_id = "CurrKF";
+	    PC_KF.KF_Pose.poses.push_back(pose_t);
+	    PC_KF.KF_ID.data = (uint64)KeyFramesId;
+	    PC_KF.pointcloud = *CloudWithKF;
+	    KFPubliser.publish(PC_KF);
+	    SKIP_ONCE = false;
+	    NEED_NEXT_PC = false;
+	  }
+	}
+    }
     Refresh_DepthCloud = false;
 }
 
