@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ros-orb-slam2
 
 ROS Publisher Node using ORB-SLAM2.
@@ -67,3 +68,6 @@ Using [Transform Broadcaster](http://wiki.ros.org/tf), this always broadcasts fr
 ### Mono USB Camera Example
 
 See [/launch/camtest.launch](https://github.com/ildoonet/ros-orb-slam2/blob/master/launch/camtest.launch).
+=======
+# ros_orb_slam2
+>>>>>>> a80b094897e9a51f31cc52596becda626c157148

@@ -35,3 +35,5 @@
 .remote-sync.json
 
 *.kdev4
+.kdev4/
+

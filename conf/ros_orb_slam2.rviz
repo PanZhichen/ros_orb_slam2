@@ -7,11 +7,12 @@ Panels:
         - /Global Options1
         - /Status1
         - /Odometry1/Shape1
-        - /TF1/Tree1
+        - /TF1
+        - /TF1/Tree1/odom1
         - /Odometry2/Shape1
         - /PointCloud22
       Splitter Ratio: 0.5
-    Tree Height: 359
+    Tree Height: 558
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -35,12 +36,12 @@ Visualization Manager:
   Class: ""
   Displays:
     - Class: rviz/Axes
-      Enabled: true
+      Enabled: false
       Length: 6
       Name: Axes
       Radius: 0.5
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Angle Tolerance: 0.100000001
       Class: rviz/Odometry
       Covariance:
@@ -76,24 +77,30 @@ Visualization Manager:
       Unreliable: false
       Value: false
     - Class: rviz/TF
-      Enabled: false
+      Enabled: true
       Frame Timeout: 15
       Frames:
         All Enabled: true
-      Marker Scale: 5
+        camera:
+          Value: true
+        odom:
+          Value: true
+      Marker Scale: 10
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        odom:
+          camera:
+            {}
       Update Interval: 0
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 46.1772766
-        Min Value: 1.79620266
+        Max Value: 40.9188843
+        Min Value: -14.8994122
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -156,8 +163,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 0.770431399
-        Min Value: -3.86718702
+        Max Value: 1.16237855
+        Min Value: -2.01663876
         Value: true
       Axis: Y
       Channel Name: intensity
@@ -208,25 +215,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 293.395447
+      Distance: 133.928741
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.0599999987
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 33.4878845
-        Y: 66.2670517
-        Z: 80.759407
+        X: 29.5205593
+        Y: 55.8904419
+        Z: 13.0216141
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.0500000007
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.00999999978
-      Pitch: 0.0852026343
+      Pitch: -0.0697973818
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.7453599
+      Yaw: 4.52035618
     Saved: ~
 Window Geometry:
   Displays:
@@ -244,5 +251,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1006
-  X: 829
-  Y: 204
+  X: 2014
+  Y: 63
