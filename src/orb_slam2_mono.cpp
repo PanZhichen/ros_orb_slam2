@@ -22,6 +22,8 @@
 
 const double PI = 3.1415926;
 const uint8_t IMAGE_SKIP = 3;
+static bool RECEIVE_NEW_POINTCLOUD = true;
+static cv::Mat Tcw_last;
 
 using namespace std;
 ros::Publisher voPubliser;
@@ -51,6 +53,18 @@ void DepthCloudHandler(const sensor_msgs::PointCloud2ConstPtr& Cloud)
   pcl::fromROSMsg(*Cloud, *depthCloud);
   Refresh_DepthCloud = true;
   CloudWithKF = Cloud;
+
+  if(depthCloud->size()>1){
+      pcl::PointXYZI point = depthCloud->points[depthCloud->size()-1];
+      if(point.x > 120.0 && point.y > 120.0 && point.z > 120.0 && point.intensity > 120.0)
+      {
+// 	std::cout<<"  WTF!!!  "<<point.x<<"  "<<point.y<<"  "<<point.z<<"  "<<point.intensity<<std::endl;
+	RECEIVE_NEW_POINTCLOUD = false;
+      }
+      else{
+	RECEIVE_NEW_POINTCLOUD = true;
+      }
+  }
 }
 
 
@@ -124,8 +138,16 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
         return;
     }
 
-    cv::Mat Tcw=mpSLAM->TrackMonocular(cv_ptrImage->image,depthCloud,cv_ptrImage->header.stamp.toSec(),Refresh_DepthCloud);
-    
+    cv::Mat Tcw;
+    if(RECEIVE_NEW_POINTCLOUD){
+	Tcw=mpSLAM->TrackMonocular(cv_ptrImage->image,depthCloud,cv_ptrImage->header.stamp.toSec(),Refresh_DepthCloud);
+	Tcw_last = Tcw;
+    }
+    else{
+      Tcw = Tcw_last;
+      std::cout<<"\033[31m ["<<cv_ptrImage->header.stamp.nsec<<"] "<<"Wating for new PointCloud......"<<"\033[0m"<<std::endl;
+    }
+
     if (Tcw.empty()) {
       return;
     }

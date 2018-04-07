@@ -15,8 +15,8 @@
   
   <node pkg="ros_orb_slam2" type="ros_orb_slam2_mono" name="ros_orb_slam2_mono" args="/home/nrsl/orb_ws/src/Lidar_in_Orb/Vocabulary/ORBvoc.bin /home/nrsl/orb_ws/src/Lidar_in_Orb/Examples/Monocular/para_mono.yaml" output="screen" />
 
-  <node pkg="ros_orb_slam2" type="doPointCloud_node" name="doPointCloud_node" />
+  <node pkg="ros_orb_slam2" type="doPointCloud_node" name="doPointCloud_node" launch-prefix="gnome-terminal -e"/>
 
-  <!--node pkg="ros_orb_slam2" type="pointcloudRegister_node" name="pointcloudRegister_node" /-->
+  <node pkg="ros_orb_slam2" type="pointcloudRegister_node" name="pointcloudRegister_node" output="screen"/>
 
 </launch>

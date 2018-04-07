@@ -18,9 +18,11 @@
 #include<pcl/common/eigen.h>
 
 #include "doPointCloud/pointDefinition.h"
+#include "kbhit/kbhit.h"
 
 const double PI = 3.1415926;
 const float FILTER_Horiz = 1.0, FILTER_Vert = 1.0;
+static bool RECEIVE_NEW = true;
 
 const int keepVoDataNum = 30;
 double voDataTime[keepVoDataNum] = {0};
@@ -209,6 +211,15 @@ void voDataHandler(const nav_msgs::Odometry::ConstPtr& voData)
       tempCloud2->points[i].y *= tempCloud2->points[i].z / 10;
       tempCloud2->points[i].intensity = 10;
     }
+    
+    if(!RECEIVE_NEW){
+      pcl::PointXYZI pointT;
+      pointT.x = 123;
+      pointT.y = 123;
+      pointT.z = 123;
+      pointT.intensity = 123;
+      tempCloud2->push_back(pointT);
+    }
 
     sensor_msgs::PointCloud2 depthCloud2;
     pcl::toROSMsg(*tempCloud2, depthCloud2);
@@ -299,67 +310,69 @@ void syncCloudHandler(const sensor_msgs::PointCloud2ConstPtr& syncCloud2)
   pcl::PointXYZI point;
   double x1, y1, z1, x2, y2, z2;
   int syncCloudNum = syncCloud->points.size();
-  for (int i = 0; i < syncCloudNum; i++) {
-    point.x = syncCloud->points[i].x;///////////////
-    point.y = syncCloud->points[i].y;//////////////
-    point.z = syncCloud->points[i].z;
-    point.intensity = timeLasted;
+  
+  if(RECEIVE_NEW){
+      for (int i = 0; i < syncCloudNum; i++) {
+	point.x = syncCloud->points[i].x;///////////////
+	point.y = syncCloud->points[i].y;//////////////
+	point.z = syncCloud->points[i].z;
+	point.intensity = timeLasted;
 
-    //把插值得到的坐标系下的点转换到voRegInd指向的那一帧
-    x1 = cosry2 * point.x - sinry2 * point.z;
-    y1 = point.y;
-    z1 = sinry2 * point.x + cosry2 * point.z;
+	//把插值得到的坐标系下的点转换到voRegInd指向的那一帧
+	x1 = cosry2 * point.x - sinry2 * point.z;
+	y1 = point.y;
+	z1 = sinry2 * point.x + cosry2 * point.z;
 
-    x2 = x1;
-    y2 = cosrx2 * y1 + sinrx2 * z1;
-    z2 = -sinrx2 * y1 + cosrx2 * z1;
+	x2 = x1;
+	y2 = cosrx2 * y1 + sinrx2 * z1;
+	z2 = -sinrx2 * y1 + cosrx2 * z1;
 
-    point.x = cosrz2 * x2 + sinrz2 * y2 - tx2;
-    point.y = -sinrz2 * x2 + cosrz2 * y2 - ty2;
-    point.z = z2 - tz2;
+	point.x = cosrz2 * x2 + sinrz2 * y2 - tx2;
+	point.y = -sinrz2 * x2 + cosrz2 * y2 - ty2;
+	point.z = z2 - tz2;
 
-    //将点云一直变换到最新的一帧坐标系下
-    if (voDataInd >= 0) {
-      int voAftInd = (voRegInd + 1) % keepVoDataNum;
-      while (voAftInd != (voDataInd + 1) % keepVoDataNum) {
-        double rx = voRx[voAftInd];
-        double ry = voRy[voAftInd];
-        double rz = voRz[voAftInd];
+	//将点云一直变换到最新的一帧坐标系下
+	if (voDataInd >= 0) {
+	  int voAftInd = (voRegInd + 1) % keepVoDataNum;
+	  while (voAftInd != (voDataInd + 1) % keepVoDataNum) {
+	    double rx = voRx[voAftInd];
+	    double ry = voRy[voAftInd];
+	    double rz = voRz[voAftInd];
 
-        double tx = voTx[voAftInd];
-        double ty = voTy[voAftInd];
-        double tz = voTz[voAftInd];
+	    double tx = voTx[voAftInd];
+	    double ty = voTy[voAftInd];
+	    double tz = voTz[voAftInd];
 
-        double cosrx = cos(rx);
-        double sinrx = sin(rx);
-        double cosry = cos(ry);
-        double sinry = sin(ry);
-        double cosrz = cos(rz);
-        double sinrz = sin(rz);
+	    double cosrx = cos(rx);
+	    double sinrx = sin(rx);
+	    double cosry = cos(ry);
+	    double sinry = sin(ry);
+	    double cosrz = cos(rz);
+	    double sinrz = sin(rz);
 
-        x1 = cosry * point.x - sinry * point.z;
-        y1 = point.y;
-        z1 = sinry * point.x + cosry * point.z;
+	    x1 = cosry * point.x - sinry * point.z;
+	    y1 = point.y;
+	    z1 = sinry * point.x + cosry * point.z;
 
-        x2 = x1;
-        y2 = cosrx * y1 + sinrx * z1;
-        z2 = -sinrx * y1 + cosrx * z1;
+	    x2 = x1;
+	    y2 = cosrx * y1 + sinrx * z1;
+	    z2 = -sinrx * y1 + cosrx * z1;
 
-        point.x = cosrz * x2 + sinrz * y2 - tx;
-        point.y = -sinrz * x2 + cosrz * y2 - ty;
-        point.z = z2 - tz;
+	    point.x = cosrz * x2 + sinrz * y2 - tx;
+	    point.y = -sinrz * x2 + cosrz * y2 - ty;
+	    point.z = z2 - tz;
 
-        voAftInd = (voAftInd + 1) % keepVoDataNum;
+	    voAftInd = (voAftInd + 1) % keepVoDataNum;
+	  }
+	}
+
+	double pointDis = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+	if (fabs(point.x / point.z) < FILTER_Horiz && fabs(point.y / point.z) < FILTER_Vert && point.z > 0.5 && pointDis < 50) {
+	  depthCloud->push_back(point);
+	}
       }
-    }
-
-    double pointDis = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
-    if (fabs(point.x / point.z) < FILTER_Horiz && fabs(point.y / point.z) < FILTER_Vert && point.z > 0.5 && pointDis < 50) {
-      depthCloud->push_back(point);
-    }
   }
 }
-
 int main(int argc, char** argv)
 {
   ros::init(argc, argv, "doPointCloud");
@@ -377,8 +390,34 @@ int main(int argc, char** argv)
 
   ros::Publisher depthCloudPub = nh.advertise<sensor_msgs::PointCloud2> ("/find_depth", 3);
   depthCloudPubPointer = &depthCloudPub;
+  
+  int tty_set_flag;
+  tty_set_flag = tty_set();
+  
+  ros::Rate loop_rate(60);
+  while(ros::ok())
+  {
+    if( kbhit() ) {
+	const int key = getchar();
+	if(key == ' '){
+	  RECEIVE_NEW = !RECEIVE_NEW;
+	  if(RECEIVE_NEW){
+	    std::cout<<"\033[36m Start to receive new PointCloud......"<<"\033[0m"<<std::endl;
+	  }
+	  else{
+	    std::cout<<"\033[31m Stoooop receiving new PointCloud!!!!!"<<"\033[0m"<<std::endl;
+	  }
+	}
+    } 
+    
+    ros::spinOnce();
 
-  ros::spin();
+    loop_rate.sleep();
+  }
+  if(tty_set_flag == 0) 
+     tty_reset();
+
+//   ros::spin();
 
   return 0;
 }
