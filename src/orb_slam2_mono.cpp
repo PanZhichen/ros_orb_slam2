@@ -24,6 +24,7 @@ const double PI = 3.1415926;
 const uint8_t IMAGE_SKIP = 3;
 static bool RECEIVE_NEW_POINTCLOUD = true;
 static cv::Mat Tcw_last;
+static long unsigned int KeyFramesIdLast=0;
 
 using namespace std;
 ros::Publisher voPubliser;
@@ -82,6 +83,14 @@ int main(int argc, char **argv)
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true,true);
+    
+    if(SLAM.getNewestKeyFrame()->mnId>0){
+       KeyFramesIdLast = SLAM.getNewestKeyFrame()->mnId;
+       cerr << endl << "--------Localization Mode--------" << endl<< endl; 
+    }
+//     else{
+//       KeyFramesIdLast = 0;
+//     }
 
     ImageGrabber igb(&SLAM);
 
@@ -104,6 +113,7 @@ int main(int argc, char **argv)
     tf::TransformBroadcaster tfBroadcaster;
     tfBroadcasterPointer = &tfBroadcaster;
     //************************************************************************************************************//
+//     std::cout<<std::endl<<std::endl<<"\033[31m ORB_SLAM2::Frame::nNextId="<<ORB_SLAM2::Frame::nNextId<<"\033[0m"<<std::endl<<std::endl<<std::endl;
 
     ros::spin();
     
@@ -222,11 +232,12 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
     }
     else{
       //-----------------------------Publish Current KeyFrame Pose-----------------------------------
-      static long unsigned int KeyFramesIdLast=0;
+//       static long unsigned int KeyFramesIdLast=ORB_SLAM2::Frame::nNextId;
       ORB_SLAM2::KeyFrame* k = mpSLAM->getNewestKeyFrame();
       long unsigned int KeyFramesId = k->mnId;
       static bool SKIP_ONCE = false;
       static bool NEED_NEXT_PC = false;
+//       std::cout<<"\033[33m KeyFramesId="<<KeyFramesId<<"  KeyFramesIdLast="<<KeyFramesIdLast<<"\033[0m"<<std::endl;
       
       if(mpSLAM->getNumKeyFrames()>0 && (KeyFramesId!=KeyFramesIdLast || NEED_NEXT_PC)){ 
 	  if(KeyFramesId!=KeyFramesIdLast){
