@@ -14,6 +14,7 @@
 #include<pcl/common/transforms.h>
 #include<pcl/common/eigen.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/filters/radius_outlier_removal.h>
 
 #include "doPointCloud/pointDefinition.h"
 #include <ros_orb_slam2/PointCloudWithKF.h>
@@ -57,7 +58,7 @@ void PCwithKFDataHandler(const ros_orb_slam2::PointCloudWithKFConstPtr& msg)
       point = tempCloud->points[i];
       double pointDis = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
 
-      if (pointDis > 0.3 && pointDis < 30 && point.z<4.0) {
+      if (pointDis > 0.3 && pointDis < 10 && point.y>-2.0) {
 	tf::Vector3 p_wc = tf::Matrix3x3(q_wc) * tf::Vector3(point.x,point.y,point.z) + t_wc;
 	point.x = p_wc.getX();
 	point.y = p_wc.getY();
@@ -118,6 +119,17 @@ void PCwithKFDataHandler(const ros_orb_slam2::PointCloudWithKFConstPtr& msg)
 	    downSizeFilter.setLeafSize(0.15, 0.15, 0.15);
 	    downSizeFilter.filter(*tempCloud);
 	    syncCloud->clear();
+	    
+	    pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
+	    outrem.setInputCloud(tempCloud);
+	    outrem.setRadiusSearch(0.25);
+	    outrem.setMinNeighborsInRadius (5);
+	    outrem.filter (*syncCloud);
+	    tempCloud->clear();
+	    
+	    pcl::PointCloud<pcl::PointXYZ>::Ptr exchange=tempCloud;
+	    tempCloud=syncCloud;
+	    syncCloud=exchange;
 	    //----------------------------------------------------------------------------
 	    tf::Quaternion q_wc(msg->KF_Pose.poses[idx0].orientation.x,msg->KF_Pose.poses[idx0].orientation.y,
 				    msg->KF_Pose.poses[idx0].orientation.z,msg->KF_Pose.poses[idx0].orientation.w);
@@ -128,7 +140,7 @@ void PCwithKFDataHandler(const ros_orb_slam2::PointCloudWithKFConstPtr& msg)
 	      point = tempCloud->points[i];
 	      double pointDis = sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
 
-	      if (pointDis > 0.3 && pointDis < 50 && point.z<10.0) {
+	      if (pointDis > 0.3 && pointDis < 25 && point.y>-6.0) {
 		tf::Vector3 p_wc = tf::Matrix3x3(q_wc) * tf::Vector3(point.x,point.y,point.z) + t_wc;
 		point.x = p_wc.getX();
 		point.y = p_wc.getY();
@@ -148,9 +160,17 @@ void PCwithKFDataHandler(const ros_orb_slam2::PointCloudWithKFConstPtr& msg)
       downSizeMapFilter.setLeafSize(0.15,0.15,0.15);
       downSizeMapFilter.filter(*tempCloud);
       surroundLoopCloud->clear();
-      pcl::PointCloud<pcl::PointXYZ>::Ptr exchange=surroundLoopCloud;
-      surroundLoopCloud=tempCloud;
-      tempCloud=exchange;
+      
+      pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
+      outrem.setInputCloud(tempCloud);
+      outrem.setRadiusSearch(0.25);
+      outrem.setMinNeighborsInRadius (5);
+      outrem.filter (*surroundLoopCloud);
+      tempCloud->clear();
+      
+//       pcl::PointCloud<pcl::PointXYZ>::Ptr exchange=surroundLoopCloud;
+//       surroundLoopCloud=tempCloud;
+//       tempCloud=exchange;
       
       string path = "/home/nrsl/orb_ws/PointCloudMap";
       static uint countPC = 0;
