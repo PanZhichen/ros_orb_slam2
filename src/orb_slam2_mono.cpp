@@ -35,6 +35,7 @@ sensor_msgs::PointCloud2ConstPtr CloudWithKF;
 nav_msgs::Odometry fresh_odom, curr_odom, last_odom;
 bool INITIALIZED=false;
 bool Refresh_DepthCloud = false;
+bool PointCloudMap;
 cv::Mat Twl = cv::Mat::eye(4,4,CV_32F);
 
 class ImageGrabber
@@ -73,6 +74,8 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "lidar_orb_mono");
     ros::start();
+    ros::NodeHandle nodeHandler;
+    nodeHandler.param<bool>("/ros_orb_slam2_mono/MappingMode",PointCloudMap,false);
 
     if(argc != 3)
     {
@@ -82,7 +85,7 @@ int main(int argc, char **argv)
     }    
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true,true);
+    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true,PointCloudMap);
     
     if(SLAM.getNewestKeyFrame()->mnId>0){
        InitKFId = SLAM.getNewestKeyFrame()->mnId;
@@ -94,7 +97,6 @@ int main(int argc, char **argv)
 
     ImageGrabber igb(&SLAM);
 
-    ros::NodeHandle nodeHandler;
     //0131ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
     
     //************************************************************************************************************//
@@ -108,7 +110,8 @@ int main(int argc, char **argv)
     ros::Subscriber imageSub = nodeHandler.subscribe<sensor_msgs::Image>("/camera/image_raw", 2, &ImageGrabber::GrabImage,&igb);
     
     voPubliser = nodeHandler.advertise<nav_msgs::Odometry> ("/cam_to_odom", 5);
-    KFPubliser = nodeHandler.advertise<ros_orb_slam2::PointCloudWithKF>("/PointCloud_with_KF",1);
+    if(PointCloudMap)
+      KFPubliser = nodeHandler.advertise<ros_orb_slam2::PointCloudWithKF>("/PointCloud_with_KF",1);
     
     tf::TransformBroadcaster tfBroadcaster;
     tfBroadcasterPointer = &tfBroadcaster;
@@ -200,6 +203,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
     tfBroadcasterPointer->sendTransform(voTrans);
     
     //-------------------------------------If Detect Loop------------------------------------------
+    if(PointCloudMap){
     static uint LoopNumLast = 0;
     uint LoopNumCurr = mpSLAM->getLoopNum();
     if(LoopNumCurr>LoopNumLast){
@@ -275,6 +279,7 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
 	    }
 	  }
       }
+    }
     }
    //---------------------------------------------------------------------------------------------------
     Refresh_DepthCloud = false;

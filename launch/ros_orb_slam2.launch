@@ -9,14 +9,19 @@
 
   <arg name="Mapping" default="true"/>
 
-  <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find ros_orb_slam2)/conf/ros_orb_slam2.rviz"/>
-  
-  <node pkg="ros_orb_slam2" type="ros_orb_slam2_mono" name="ros_orb_slam2_mono" args="/home/nrsl/orb_ws/src/Lidar_in_Orb/Vocabulary/ORBvoc.bin /home/nrsl/orb_ws/src/Lidar_in_Orb/Examples/Monocular/para_mono.yaml" output="screen" />
+  <node pkg="ros_orb_slam2" type="ros_orb_slam2_mono" name="ros_orb_slam2_mono" args="/home/nrsl/orb_ws/src/Lidar_in_Orb/Vocabulary/ORBvoc.bin /home/nrsl/orb_ws/src/Lidar_in_Orb/Examples/Monocular/para_mono.yaml" output="screen" >
+    <param name="MappingMode" type="bool" value="$(arg Mapping)"/>
+  </node>
 
-  <node pkg="ros_orb_slam2" type="doPointCloud_node" name="doPointCloud_node" launch-prefix="gnome-terminal -e"/>
+  <node if="$(arg Mapping)" pkg="ros_orb_slam2" type="doPointCloud_node" name="doPointCloud_node" launch-prefix="gnome-terminal -e"/>
+
+  <node unless="$(arg Mapping)" pkg="ros_orb_slam2" type="doPointCloud_node" name="doPointCloud_node"/>
+
+  <node unless="$(arg Mapping)" launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find ros_orb_slam2)/conf/localization.rviz"/>
 
   <group if="$(arg Mapping)">
     <node pkg="ros_orb_slam2" type="pointcloudRegister_node" name="pointcloudRegister_node" output="screen"/>
+    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find ros_orb_slam2)/conf/ros_orb_slam2.rviz"/>
   </group>
 
 </launch>
