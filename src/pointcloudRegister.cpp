@@ -18,6 +18,7 @@
 
 #include "doPointCloud/pointDefinition.h"
 #include <ros_orb_slam2/PointCloudWithKF.h>
+#include <octomap/octomap.h>
 
 using namespace std;
 
@@ -33,6 +34,7 @@ const int downSizeMap = 15;
 ros::Publisher *surroundCloudPubPointer = NULL;
 ros::Publisher surroundLoopPub;
 vector<ros_orb_slam2::PointCloudWithKF> PCwithKF_vec;
+octomap::OcTree tree(0.25);
 
 void PCwithKFDataHandler(const ros_orb_slam2::PointCloudWithKFConstPtr& msg)
 {
@@ -98,14 +100,18 @@ void PCwithKFDataHandler(const ros_orb_slam2::PointCloudWithKFConstPtr& msg)
     else{
       surroundLoopCloud->clear();
       uint count=0;
+      bool find_match;
       for(uint idx0=1;idx0<msg->KF_ID.data.size();idx0++){
 	uint64_t KF_ID_L = msg->KF_ID.data[idx0];
+	find_match = false;
+	octomap::Pointcloud oct_cloud;
 	
 	for(uint idx1=0;idx1<PCwithKF_vec.size();idx1++){
 	  
 	  if(KF_ID_L == PCwithKF_vec[idx1].KF_ID.data[0]){
 	    count++;
-	    
+	    std::cout<<"During processing ... "<<count<<std::endl;
+	    find_match = true;
 	    syncCloud->clear();
 	    tempCloud->clear();
 	    pcl::fromROSMsg(PCwithKF_vec[idx1].pointcloud, *syncCloud);
@@ -146,9 +152,13 @@ void PCwithKFDataHandler(const ros_orb_slam2::PointCloudWithKFConstPtr& msg)
 		point.y = p_wc.getY();
 		point.z = p_wc.getZ();
 		surroundLoopCloud->push_back(point);
+		oct_cloud.push_back(point.x,point.y,point.z);
 	      }
 	    }
+	    tree.insertPointCloud(oct_cloud,octomap::point3d(t_wc.getX(),t_wc.getY(),t_wc.getZ()));
 	  }
+	  if(find_match)
+	    break;
 	}
       }
 
@@ -160,24 +170,29 @@ void PCwithKFDataHandler(const ros_orb_slam2::PointCloudWithKFConstPtr& msg)
       downSizeMapFilter.setLeafSize(0.15,0.15,0.15);
       downSizeMapFilter.filter(*tempCloud);
       surroundLoopCloud->clear();
-      
-      pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
-      outrem.setInputCloud(tempCloud);
-      outrem.setRadiusSearch(0.25);
-      outrem.setMinNeighborsInRadius (5);
-      outrem.filter (*surroundLoopCloud);
-      tempCloud->clear();
-      
-//       pcl::PointCloud<pcl::PointXYZ>::Ptr exchange=surroundLoopCloud;
-//       surroundLoopCloud=tempCloud;
-//       tempCloud=exchange;
-      
-      string path = "/home/nrsl/orb_ws/PointCloudMap";
+//------------------------------------------------------------------------
+//       pcl::RadiusOutlierRemoval<pcl::PointXYZ> outrem;
+//       outrem.setInputCloud(tempCloud);
+//       outrem.setRadiusSearch(0.25);
+//       outrem.setMinNeighborsInRadius (5);
+//       outrem.filter (*surroundLoopCloud);
+//       tempCloud->clear();
+//------------------------------------------------------------------------     
+      pcl::PointCloud<pcl::PointXYZ>::Ptr exchange=surroundLoopCloud;
+      surroundLoopCloud=tempCloud;
+      tempCloud=exchange;
+//------------------------------------------------------------------------      
+      string path = "/home/nrsl/orb_ws/";
       static uint countPC = 0;
       countPC++;
       ostringstream oss;
-      oss << path << countPC << ".pcd";
+      oss << path << "PointCloudMap_" << countPC << ".pcd";
       pcl::io::savePCDFileASCII (oss.str(), *surroundLoopCloud);
+      
+      ostringstream oct_oss;
+      oct_oss<<path<< "OctoMap_" << countPC << ".bt";
+      tree.updateInnerOccupancy();
+      tree.writeBinary(oct_oss.str());
 
       sensor_msgs::PointCloud2 surroundCloud2;
       pcl::toROSMsg(*surroundLoopCloud, surroundCloud2);
@@ -186,6 +201,7 @@ void PCwithKFDataHandler(const ros_orb_slam2::PointCloudWithKFConstPtr& msg)
       surroundLoopPub.publish(surroundCloud2);
       surroundLoopCloud->clear();
       surroundCloud->clear();
+      tree.clear();
     }  
 }
 

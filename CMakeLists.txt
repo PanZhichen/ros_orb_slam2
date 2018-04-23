@@ -21,7 +21,8 @@ if(NOT OpenCV_FOUND)
       message(FATAL_ERROR "OpenCV > 2.4.3 not found.")
    endif()
 endif()
-
+set (octomap_ros_DIR "/home/nrsl/moveit_ws/devel/share/octomap_ros/cmake")
+find_package(octomap 1.7 REQUIRED)
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
 
@@ -37,6 +38,8 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   pcl_ros
   message_generation
+  octomap_msgs
+  octomap_ros
 )
 
 add_message_files(
@@ -60,6 +63,8 @@ catkin_package(
     tf
     pcl_ros
     message_runtime
+    octomap_msgs
+    octomap_ros
 )
 
 set(ORBSLAM2_DIR "/home/nrsl/orb_ws/src/Lidar_in_Orb")
@@ -74,6 +79,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${Pangolin_INCLUDE_DIRS}
+  ${OCTOMAP_INCLUDE_DIRS}
 
   ${PROJECT_SOURCE_DIR}/include
 
@@ -99,7 +105,7 @@ add_executable(doPointCloud_node src/processDepthmap.cpp)
 target_link_libraries(doPointCloud_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES})
 
 add_executable(pointcloudRegister_node src/pointcloudRegister.cpp)
-target_link_libraries(pointcloudRegister_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES})
+target_link_libraries(pointcloudRegister_node ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${PCL_LIBRARIES} ${OCTOMAP_LIBRARIES})
 
 
 add_executable(transPointCloud_node src/trans_vlp.cpp)

@@ -241,21 +241,18 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
       long unsigned int KeyFramesId = k->mnId;
       static bool SKIP_ONCE = false;
       static bool NEED_NEXT_PC = false;
-//       std::cout<<"\033[33m KeyFramesId="<<KeyFramesId<<"  KeyFramesIdLast="<<KeyFramesIdLast<<"\033[0m"<<std::endl;
-      
       if(mpSLAM->getNumKeyFrames()>0 && (KeyFramesId!=KeyFramesIdLast || NEED_NEXT_PC)){ 
-	  if(KeyFramesId!=KeyFramesIdLast){
-	    SKIP_ONCE = false;
-	  }
-	  NEED_NEXT_PC = true;
+// 	  if(KeyFramesId!=KeyFramesIdLast){
+// 	    SKIP_ONCE = false;
+// 	  }
+// 	  NEED_NEXT_PC = true;
 	  KeyFramesIdLast=KeyFramesId;
 	  
-	  if(!SKIP_ONCE){
-	    SKIP_ONCE = true;
-	  }
-	  else{
-	    if(Refresh_DepthCloud && SKIP_ONCE){
-	      //std::cout<<"\033[33m KeyFramesId="<<KeyFramesId<<"\033[0m"<<std::endl;
+// 	  if(!SKIP_ONCE){
+// 	    SKIP_ONCE = true;
+// 	  }
+// 	  else{
+// 	    if(Refresh_DepthCloud && SKIP_ONCE){
 	      cv::Mat KF_Twc = k->getTwc();
 	      vector<float> KF_q = ORB_SLAM2::Converter::toQuaternion(KF_Twc.rowRange(0,3).colRange(0,3));
 	      ros_orb_slam2::PointCloudWithKF PC_KF;
@@ -272,12 +269,18 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msgImag)
 	      PC_KF.KF_Pose.header.frame_id = "CurrKF";
 	      PC_KF.KF_Pose.poses.push_back(pose_t);
 	      PC_KF.KF_ID.data.push_back((uint64)KeyFramesId);
-	      PC_KF.pointcloud = *CloudWithKF;
+// 	      PC_KF.pointcloud = *CloudWithKF;
+	      //-------------------------------------------------------------------------
+	      //sensor_msgs::PointCloud2 depthCloud2;
+	      pcl::toROSMsg(*(mpSLAM->getPointCloud_KF()), PC_KF.pointcloud);
+	      PC_KF.pointcloud.header.frame_id = "camera";
+	      PC_KF.pointcloud.header.stamp = cv_ptrImage->header.stamp;
+	      //-------------------------------------------------------------------------
 	      KFPubliser.publish(PC_KF);
 	      SKIP_ONCE = false;
 	      NEED_NEXT_PC = false;
-	    }
-	  }
+// 	    }
+// 	  }
       }
     }
     }
